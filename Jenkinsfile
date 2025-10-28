@@ -11,19 +11,24 @@ pipeline {
     stages {
 
         /*********************
-         * 1️⃣ Installation de Helm
+         * 1️⃣ Installation locale de Helm (sans sudo)
          *********************/
         stage('Installer Helm') {
             steps {
                 sh '''
                     if ! command -v helm >/dev/null 2>&1; then
-                        echo "🛠️ Installation de Helm..."
-                        apt-get update -qq && apt-get install -y curl >/dev/null
-                        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+                        echo "🛠️ Téléchargement et installation locale de Helm..."
+                        mkdir -p $HOME/bin
+                        curl -fsSL https://get.helm.sh/helm-v3.14.2-linux-amd64.tar.gz -o helm.tar.gz
+                        tar -zxvf helm.tar.gz > /dev/null
+                        mv linux-amd64/helm $HOME/bin/helm
+                        export PATH=$HOME/bin:$PATH
+                        echo "✅ Helm installé localement dans $HOME/bin"
                     else
                         echo "✅ Helm déjà installé."
                     fi
-                    helm version
+                    export PATH=$HOME/bin:$PATH
+                    helm version || echo "⚠️ Helm non détecté dans le PATH"
                 '''
             }
         }
@@ -74,11 +79,10 @@ pipeline {
         stage('Déployer avec Helm') {
             steps {
                 withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
-                    withEnv(["KUBECONFIG=${KUBECONFIG_FILE}"]) {
+                    withEnv(["KUBECONFIG=${KUBECONFIG_FILE}", "PATH=$HOME/bin:$PATH"]) {
                         script {
                             echo "📦 Déploiement de ${FULL_IMAGE} sur Kubernetes avec Helm..."
 
-                            // Upgrade/Install Helm
                             sh """
                                 helm upgrade --install mon-app ${HELM_CHART_PATH} \
                                     --set image.repository=${DOCKER_REPO} \
