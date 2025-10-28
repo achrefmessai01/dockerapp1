@@ -57,8 +57,8 @@ pipeline {
 							// Patch kubeconfig pour que l'API server soit joignable depuis le conteneur Jenkins
 							// Remplace 127.0.0.1 par host.docker.internal (Docker Desktop). Pour testing TLS, SKIP_TLS_VERIFY peut être activé via l'environnement.
 							sh '''
-							# Remplace 127.0.0.1 par host.docker.internal si présent
-							sed -E "s|(server: )https?://127\\.0\\.0\\.1(:[0-9]+)?|\1https://host.docker.internal\2|" "$KUBECONFIG_FILE" > "$KUBECONFIG_FILE.tmp" || cp "$KUBECONFIG_FILE" "$KUBECONFIG_FILE.tmp"
+							# Simpler, more reliable replacement: change any 127.0.0.1 to host.docker.internal
+							sed -E 's|127\\.0\\.0\\.1|host.docker.internal|g' "$KUBECONFIG_FILE" > "$KUBECONFIG_FILE.tmp" || cp "$KUBECONFIG_FILE" "$KUBECONFIG_FILE.tmp"
 							# Si nécessaire, ajouter insecure-skip-tls-verify (dev only) pour éviter les erreurs TLS liées au SAN
 							if [ "${SKIP_TLS_VERIFY}" = "true" ]; then
 								awk '/certificate-authority-data:/{print; print "    insecure-skip-tls-verify: true"; next}1' "$KUBECONFIG_FILE.tmp" > "$KUBECONFIG_FILE.patched" && mv "$KUBECONFIG_FILE.patched" "$KUBECONFIG_FILE.tmp"
@@ -66,8 +66,8 @@ pipeline {
 							mv "$KUBECONFIG_FILE.tmp" "$KUBECONFIG_FILE"
 							chmod 600 "$KUBECONFIG_FILE" || true
 						
-echo "Using kubeconfig server:"
-							grep "server:" "$KUBECONFIG_FILE" || true
+				echo "Using kubeconfig server (after patch):"
+				grep -n "server:" "$KUBECONFIG_FILE" || true
 							# Applique les manifests en explicitant le kubeconfig (sécurise contre les problèmes d'environnement)
 							kubectl --kubeconfig="$KUBECONFIG_FILE" apply -f deployment-merged.yaml
 							kubectl --kubeconfig="$KUBECONFIG_FILE" apply -f service.yaml
