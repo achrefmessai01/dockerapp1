@@ -1,11 +1,13 @@
 pipeline {
     agent any
+
     environment {
-        DOCKER_REPO = 'achrefmessai/dockerapp1'  // Remplacer par votre repo Docker Hub
-        SKIP_TLS_VERIFY = 'true'                // Mettre à 'true' si problème TLS (dev only)
+        DOCKER_REPO = 'achrefmessai/dockerapp1' // ton repo Docker Hub
+        SKIP_TLS_VERIFY = 'true'                // garde true si tu utilises Docker Desktop ou Minikube
     }
 
     stages {
+
         stage('Préparer le tag') {
             steps {
                 script {
@@ -33,9 +35,11 @@ pipeline {
         stage('Pousser l\'image Docker') {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'dockercred', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
-                    sh 'echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin'
-                    sh "docker push ${env.FULL_IMAGE}"
-                    sh 'docker logout'
+                    sh '''
+                        echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+                        docker push ${FULL_IMAGE}
+                        docker logout
+                    '''
                 }
             }
         }
@@ -45,31 +49,22 @@ pipeline {
                 withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
                     withEnv(["KUBECONFIG=${KUBECONFIG_FILE}"]) {
                         script {
-                            // Mise à jour de l'image dans le manifest
-                            sh "sed -E 's|(image: ).*|\\1${env.FULL_IMAGE}|' deployment.yaml > deployment-merged.yaml || true"
-                            sh "if [ ! -s deployment-merged.yaml ]; then cp deployment.yaml deployment-merged.yaml; fi"
-
-                            // Patch du kubeconfig pour Jenkins (Docker Desktop)
                             sh '''
-                            # Remplace 127.0.0.1 par host.docker.internal (accès depuis le conteneur Jenkins)
-                            sed -E 's|127\\.0\\.0\\.1|host.docker.internal|g' "$KUBECONFIG_FILE" > "$KUBECONFIG_FILE.tmp" || cp "$KUBECONFIG_FILE" "$KUBECONFIG_FILE.tmp"
+                                echo "🔧 Vérification du cluster depuis Jenkins..."
+                                kubectl config view --minify
 
-                            # Si SKIP_TLS_VERIFY=true → supprimer les certificats et ajouter "insecure-skip-tls-verify"
-                            if [ "${SKIP_TLS_VERIFY}" = "true" ]; then
-                              echo "⚠️  SKIP_TLS_VERIFY activé : suppression du certificat et ajout de insecure-skip-tls-verify"
-                              awk '!/certificate-authority-data:/' "$KUBECONFIG_FILE.tmp" > "$KUBECONFIG_FILE.clean"
-                              awk '/clusters:/{print; print "  - cluster:"; print "      insecure-skip-tls-verify: true"; next}1' "$KUBECONFIG_FILE.clean" > "$KUBECONFIG_FILE.tmp"
-                            fi
+                                echo "📝 Mise à jour de l'image dans le manifest..."
+                                sed -E "s|(image: ).*|\\1${FULL_IMAGE}|" deployment.yaml > deployment-merged.yaml || cp deployment.yaml deployment-merged.yaml
 
-                            mv "$KUBECONFIG_FILE.tmp" "$KUBECONFIG_FILE"
-                            chmod 600 "$KUBECONFIG_FILE" || true
+                                # Remplacer 127.0.0.1 par host.docker.internal pour accès Docker Desktop
+                                sed -i 's|127\\.0\\.0\\.1|host.docker.internal|g' "$KUBECONFIG_FILE" || true
 
-                            echo "Using kubeconfig server (after patch):"
-                            grep -n "server:" "$KUBECONFIG_FILE" || true
+                                echo "🚀 Déploiement sur Kubernetes..."
+                                kubectl apply -f deployment-merged.yaml
+                                kubectl apply -f service.yaml
 
-                            # Appliquer les manifests
-                            kubectl --kubeconfig="$KUBECONFIG_FILE" apply -f deployment-merged.yaml
-                            kubectl --kubeconfig="$KUBECONFIG_FILE" apply -f service.yaml
+                                echo "✅ Déploiement terminé sur le cluster :"
+                                kubectl get pods -o wide
                             '''
                         }
                     }
