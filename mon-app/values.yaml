@@ -1,0 +1,42 @@
+# values.yaml — Chart Helm pour ton app Node.js
+
+replicaCount: 1
+
+image:
+  repository: achrefmessai/dockerapp1   # ton repo Docker Hub
+  tag: "latest"                         # Jenkins mettra à jour ce tag dynamiquement
+  pullPolicy: IfNotPresent
+
+service:
+  type: NodePort                        # expose le service sur un port accessible
+  port: 80                              # port exposé par le conteneur
+
+resources: {}
+  # Exemple si tu veux limiter les ressources :
+  # limits:
+  #   cpu: 200m
+  #   memory: 256Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+livenessProbe:
+  httpGet:
+    path: /
+    port: 80
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+readinessProbe:
+  httpGet:
+    path: /
+    port: 80
+  initialDelaySeconds: 3
+  periodSeconds: 5
+
+autoscaling:
+  enabled: false
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

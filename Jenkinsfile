@@ -2,32 +2,24 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_REPO = 'achrefmessai/dockerapp1' // ton repo Docker Hub
-        SKIP_TLS_VERIFY = 'true'                // garde true si tu utilises Docker Desktop ou Minikube
+        DOCKER_REPO = 'achrefmessai/dockerapp1'
+        IMAGE_TAG = "${env.BUILD_NUMBER}"
+        FULL_IMAGE = "${DOCKER_REPO}:${IMAGE_TAG}"
+        HELM_CHART_PATH = './mon-app'
     }
 
     stages {
-
-        stage('Préparer le tag') {
+        stage('Préparer le code') {
             steps {
-                script {
-                    def shortSha = 'nocmt'
-                    try {
-                        shortSha = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
-                    } catch (err) {
-                        echo "Impossible d'obtenir le SHA git: ${err}"
-                    }
-                    env.IMAGE_TAG = "${env.BUILD_NUMBER ?: 'local'}-${shortSha}"
-                    env.FULL_IMAGE = "${env.DOCKER_REPO}:${env.IMAGE_TAG}"
-                    echo "Image tag: ${env.FULL_IMAGE}"
-                }
+                checkout scm
+                echo "✅ Dépôt cloné avec succès."
             }
         }
 
         stage('Construire l\'image Docker') {
             steps {
                 script {
-                    sh "docker build -t ${env.FULL_IMAGE} ."
+                    sh "docker build -t ${FULL_IMAGE} ."
                 }
             }
         }
@@ -44,25 +36,20 @@ pipeline {
             }
         }
 
-        stage('Déployer sur Kubernetes') {
+        stage('Déployer avec Helm') {
             steps {
                 withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
                     withEnv(["KUBECONFIG=${KUBECONFIG_FILE}"]) {
                         script {
-                            sh '''
-                                echo "🔧 Vérification du cluster depuis Jenkins..."
-                                kubectl config view --minify
-
-                                echo "📝 Mise à jour de l'image dans le manifest..."
-                                sed -E "s|(image: ).*|\\1${FULL_IMAGE}|" deployment.yaml > deployment-merged.yaml || cp deployment.yaml deployment-merged.yaml
-
-                                echo "🚀 Déploiement sur Kubernetes..."
-                                kubectl apply -f deployment-merged.yaml
-                                kubectl apply -f service.yaml
-
-                                echo "✅ Déploiement terminé sur le cluster :"
-                                kubectl get pods -o wide
-                            '''
+                            // Met à jour l’image dans Helm via --set
+                            sh """
+                                helm upgrade --install mon-app ${HELM_CHART_PATH} \
+                                --set image.repository=${DOCKER_REPO} \
+                                --set image.tag=${IMAGE_TAG} \
+                                --set image.pullPolicy=IfNotPresent \
+                                --namespace default \
+                                --create-namespace
+                            """
                         }
                     }
                 }
@@ -72,10 +59,10 @@ pipeline {
 
     post {
         success {
-            echo "✅ Pipeline terminé avec succès. Image déployée : ${env.FULL_IMAGE}"
+            echo "✅ Pipeline terminé avec succès. Déployé avec Helm : ${FULL_IMAGE}"
         }
         failure {
-            echo "❌ Pipeline échoué. Vérifiez les logs de Jenkins."
+            echo "❌ Pipeline échoué. Vérifie les logs Jenkins."
         }
     }
 }
