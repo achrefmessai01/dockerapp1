@@ -4,12 +4,8 @@ pipeline {
 			DOCKER_REPO = 'achrefmessai/dockerapp1' // remplacer par votre repo Docker Hub, ex: myuser/mon-app
 		}
 	stages {
-		stage('Cloner le dépôt') {
-			steps {
-				// Si Jenkins est configuré pour récupérer depuis SCM, ce step peut être omis
-				git url: 'https://github.com/achrefmessai01/dockerapp1.git'
-			}
-		}
+		// Checkout is handled by the Pipeline "Pipeline script from SCM" configuration;
+		// explicit git checkout stage removed to avoid double-checkout and branch mismatches.
 
 		stage('Préparer le tag') {
 			steps {
