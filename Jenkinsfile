@@ -3,7 +3,7 @@ pipeline {
 		environment {
 			DOCKER_REPO = 'achrefmessai/dockerapp1' // remplacer par votre repo Docker Hub, ex: myuser/mon-app
 			// Si vous faites face à des erreurs TLS pendant les tests, mettre à 'true' (dev only)
-			SKIP_TLS_VERIFY = 'false'
+			SKIP_TLS_VERIFY = 'true'
 		}
 	stages {
 		// Checkout is handled by the Pipeline "Pipeline script from SCM" configuration;
