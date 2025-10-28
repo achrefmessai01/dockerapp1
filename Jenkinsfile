@@ -56,9 +56,6 @@ pipeline {
                                 echo "📝 Mise à jour de l'image dans le manifest..."
                                 sed -E "s|(image: ).*|\\1${FULL_IMAGE}|" deployment.yaml > deployment-merged.yaml || cp deployment.yaml deployment-merged.yaml
 
-                                # Remplacer 127.0.0.1 par host.docker.internal pour accès Docker Desktop
-                                sed -i 's|127\\.0\\.0\\.1|host.docker.internal|g' "$KUBECONFIG_FILE" || true
-
                                 echo "🚀 Déploiement sur Kubernetes..."
                                 kubectl apply -f deployment-merged.yaml
                                 kubectl apply -f service.yaml
