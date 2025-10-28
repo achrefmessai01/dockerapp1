@@ -2,6 +2,8 @@ pipeline {
 	agent any
 		environment {
 			DOCKER_REPO = 'achrefmessai/dockerapp1' // remplacer par votre repo Docker Hub, ex: myuser/mon-app
+			// Si vous faites face à des erreurs TLS pendant les tests, mettre à 'true' (dev only)
+			SKIP_TLS_VERIFY = 'false'
 		}
 	stages {
 		// Checkout is handled by the Pipeline "Pipeline script from SCM" configuration;
@@ -52,8 +54,24 @@ pipeline {
 							sh "sed -E 's|(image: ).*|\\1${env.FULL_IMAGE}|' deployment.yaml > deployment-merged.yaml || true"
 							// Si sed n'a pas créé le fichier (par ex. Windows), on retente une simple substitution
 							sh "if [ ! -s deployment-merged.yaml ]; then cp deployment.yaml deployment-merged.yaml; fi"
-							sh "kubectl apply -f deployment-merged.yaml"
-							sh "kubectl apply -f service.yaml"
+							// Patch kubeconfig pour que l'API server soit joignable depuis le conteneur Jenkins
+							// Remplace 127.0.0.1 par host.docker.internal (Docker Desktop). Pour testing TLS, SKIP_TLS_VERIFY peut être activé via l'environnement.
+							sh '''
+							# Remplace 127.0.0.1 par host.docker.internal si présent
+							sed -E "s|(server: )https?://127\\.0\\.0\\.1(:[0-9]+)?|\1https://host.docker.internal\2|" "$KUBECONFIG_FILE" > "$KUBECONFIG_FILE.tmp" || cp "$KUBECONFIG_FILE" "$KUBECONFIG_FILE.tmp"
+							# Si nécessaire, ajouter insecure-skip-tls-verify (dev only) pour éviter les erreurs TLS liées au SAN
+							if [ "${SKIP_TLS_VERIFY}" = "true" ]; then
+								awk '/certificate-authority-data:/{print; print "    insecure-skip-tls-verify: true"; next}1' "$KUBECONFIG_FILE.tmp" > "$KUBECONFIG_FILE.patched" && mv "$KUBECONFIG_FILE.patched" "$KUBECONFIG_FILE.tmp"
+							fi
+							mv "$KUBECONFIG_FILE.tmp" "$KUBECONFIG_FILE"
+							chmod 600 "$KUBECONFIG_FILE" || true
+						
+echo "Using kubeconfig server:"
+							grep "server:" "$KUBECONFIG_FILE" || true
+							# Applique les manifests en explicitant le kubeconfig (sécurise contre les problèmes d'environnement)
+							kubectl --kubeconfig="$KUBECONFIG_FILE" apply -f deployment-merged.yaml
+							kubectl --kubeconfig="$KUBECONFIG_FILE" apply -f service.yaml
+							'''
 						}
 					}
 				}
