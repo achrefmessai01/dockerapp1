@@ -14,9 +14,11 @@ spec:
       labels:
         app: mon-app
     spec:
+      imagePullSecrets:
+        - name: regcred
       containers:
         - name: mon-app
-          image: votre-dockerhub/mon-app:latest # placeholder, pipeline remplacera par le tag réel
+          image: achrefmessai/dockerapp1:latest # placeholder, pipeline remplacera par le tag réel
           ports:
             - containerPort: 80
           readinessProbe:

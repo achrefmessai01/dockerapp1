@@ -1,13 +1,13 @@
 pipeline {
 	agent any
-	environment {
-		DOCKER_REPO = 'votre-dockerhub/mon-app' // remplacer par votre repo Docker Hub, ex: myuser/mon-app
-	}
+		environment {
+			DOCKER_REPO = 'achrefmessai/dockerapp1' // remplacer par votre repo Docker Hub, ex: myuser/mon-app
+		}
 	stages {
 		stage('Cloner le dépôt') {
 			steps {
 				// Si Jenkins est configuré pour récupérer depuis SCM, ce step peut être omis
-				git url: 'https://github.com/mon-depot/mon-app.git'
+				git url: 'https://github.com/achrefmessai01/dockerapp1.git'
 			}
 		}
 
@@ -38,7 +38,7 @@ pipeline {
 
 		stage('Pousser l\'image Docker') {
 			steps {
-				withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
+				withCredentials([usernamePassword(credentialsId: 'dockercred', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
 					sh 'echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin'
 					sh "docker push ${env.FULL_IMAGE}"
 					sh 'docker logout'

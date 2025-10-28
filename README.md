@@ -30,16 +30,16 @@ docker run -p 8080:80 mon-app:local
 Pousser vers Docker Hub (exemple) :
 
 ```powershell
-# remplacer myuser/mon-app par votre repo
-docker tag mon-app:local myuser/mon-app:1.0
+# Exemple pour pousser vers Docker Hub (remplacez les tags selon besoin)
+docker tag mon-app:local achrefmessai/dockerapp1:1.0
 docker login
-docker push myuser/mon-app:1.0
+docker push achrefmessai/dockerapp1:1.0
 ```
 
 Configurer Jenkins
 1. Lancer Jenkins (ex: via Docker). Voir les notes dans les instructions fournies.
 2. Ajouter Credentials:
-   - `dockerhub-creds` (Username with password)
+   - `dockercred` (Username with password) — utilisez votre Docker Hub username `achrefmessai` et le token/mot de passe
    - `kubeconfig` (Secret file) — upload de votre `~/.kube/config`
 3. Créer un Pipeline Job et pointer sur ce repo (ou coller le `Jenkinsfile` dans le job).
 
@@ -50,8 +50,7 @@ Git & push vers GitHub
 git init
 git add .
 git commit -m "Initial commit: mon-app + Jenkinsfile + manifests"
-# Remplacez <remote-url> par l'URL de votre repo GitHub (ex: https://github.com/username/repo.git)
-git remote add origin <remote-url>
+git remote add origin https://github.com/achrefmessai01/dockerapp1.git
 git branch -M main
 git push -u origin main
 ```
